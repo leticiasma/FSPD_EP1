@@ -1,0 +1,5 @@
+a-i - Sequência de zoom que foi apresentada durante a aula.
+      Cada arquivo tem uma linha, representando uma imagem de 640x480 pixels.
+
+t   - Um conjunto de 64 regioes que cobrem o espaco da figura do arquivo h
+
