@@ -1,7 +1,7 @@
 all: build
 
 build: mandel-tiles-graphic.cpp
-	g++ -Wall -g -o prog mandel-tiles-graphic.cpp -lgraph
+	g++ -Wall -g -o prog mandel-tiles-graphic.cpp -lpthread
 
 run: build
 	./prog $(ARGS)

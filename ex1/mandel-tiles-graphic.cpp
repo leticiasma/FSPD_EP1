@@ -12,7 +12,7 @@
 #define MAXITER 32768
 
 FILE* input; // descriptor for the list of tiles (cannot be stdin)
-int   color_pick = 5; // decide how to choose the color palette
+int   numThreads = 5; // decide how to choose the color palette
 
 // params for each call to the fractal function
 typedef struct {
@@ -60,7 +60,7 @@ int input_params( fractal_param_t* p )
 void fractal( fractal_param_t* p )
 {
 	double dx, dy;
-	int i, j, k, color;
+	int i, j, k;
 	double x, y, u, v, u2, v2;
 
 	dx = ( p->xmax - p->xmin ) / p->ires;
@@ -93,14 +93,6 @@ void fractal( fractal_param_t* p )
 				u2 = u * u;
 				v2 = v * v;
 			}
-			if (k==MAXITER) {
-				// converging areas are black
-				color = 0;
-			} else {
-				// graphics mode has only 16 colors;
-				// choose a range and recycle!
-				color = ( k >> color_pick ) %16;
-			}
 		}
 	}
 }
@@ -125,11 +117,11 @@ int main ( int argc, char* argv[] )
 	fractal_param_t p;
 
 	if ((argc!=2)&&(argc!=3)) {
-		fprintf(stderr,"usage %s filename [color_pick]\n", argv[0] );
+		fprintf(stderr,"usage %s filename [numThreads]\n", argv[0] );
 		exit(-1);
 	} 
 	if (argc==3) {
-		color_pick = atoi(argv[2]);
+		numThreads = atoi(argv[2]);
 	} 
 	if ((input=fopen(argv[1],"r"))==NULL) {
 		perror("fdopen");
