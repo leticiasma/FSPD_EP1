@@ -1,7 +1,7 @@
 all: build
 
-build: mandel-tiles-graphic.c
-	gcc -o prog mandel-tiles-graphic.c -lgraph
+build: mandel-tiles-graphic.cpp
+	g++ -Wall -g -o prog mandel-tiles-graphic.cpp -lgraph
 
 run: build
 	./prog $(ARGS)
