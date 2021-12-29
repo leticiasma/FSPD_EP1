@@ -7,12 +7,16 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include <string>
+#include <queue>
+#include <iostream>
+
 #define MAXX 640
 #define MAXY 480
 #define MAXITER 32768
 
 FILE* input; // descriptor for the list of tiles (cannot be stdin)
-int   numThreads = 5; // decide how to choose the color palette
+int numThreads = 5; // decide how to choose the color palette
 
 // params for each call to the fractal function
 typedef struct {
@@ -29,8 +33,7 @@ typedef struct {
  * para manter uma fila de trabalho abastecida para as threads
  * trabalhadoras.
  ****************************************************************/
-int input_params( fractal_param_t* p )
-{ 
+int input_params(fractal_param_t* p) { 
 	int n;
 	n = fscanf(input,"%d %d %d %d",&(p->left),&(p->low),&(p->ires),&(p->jres));
 	if (n == EOF) return n;
@@ -57,14 +60,13 @@ int input_params( fractal_param_t* p )
  * a cada momento, para manter as restricoes desritas no enunciado.
  ****************************************************************/
 // Function to draw mandelbrot set
-void fractal( fractal_param_t* p )
-{
+void fractal(fractal_param_t* p){
 	double dx, dy;
 	int i, j, k;
 	double x, y, u, v, u2, v2;
 
-	dx = ( p->xmax - p->xmin ) / p->ires;
-	dy = ( p->ymax - p->ymin ) / p->jres;
+	dx = (p->xmax - p->xmin) / p->ires;
+	dy = (p->ymax - p->ymin) / p->jres;
 	
 	// scanning every point in that rectangular area.
 	// Each point represents a Complex number (x + yi).
@@ -97,6 +99,48 @@ void fractal( fractal_param_t* p )
 	}
 }
 
+void* rotinaThreadLeitura(void* indexThread){
+//void* rotinaThreadLeitura(std::queue<fractal_param_t>& filaDeFractais, fractal_param_t* fractal, void* indexThread){
+//    while (input_params(fractal)!=EOF){
+//        fractal_param_t* proxFractal;
+
+
+//        fractal(fractal);
+//    } 
+
+std::cout<<"A"<<std::endl;
+}
+
+void* rotinaThreadTrabalhadora(void* indexThread){
+std::cout<<"B"<<std::endl;
+}
+
+void* func2(void* rank){
+	//Verifica se está liberado buscar na fila
+	//Tira um fractal da fila
+	//Se fila de fractais .size < (numThreads-1)
+	//acorda a thread 0
+
+	//enquanto fractal não é o EOW
+	//marcar inicio tempo
+	//chama fractal
+	//marca final tempo
+	//preencher o array de tempo das threads
+	//consegue um fractal para trabalhar com
+
+}
+
+void* func1(void* rank){
+	
+	//enquanto não chegou no final do arquivo 
+	//declarar um fractal
+	//se fila de fractais .size > 4*(numThreads-1)
+	//	vai dormir, esperando ser acordada
+	//inclui na fila, o fractal
+
+	//coloca EOW *(numThreads-1) na fila
+}
+
 /****************************************************************
  * Essa versao do programa, sequencial le a descricao de um bloco
  * de imagem do conjunto de mandelbrot por vez e faz a geracao
@@ -111,26 +155,42 @@ void fractal( fractal_param_t* p )
  * e computa as estatisticas do sistema (que serao a unica saida
  * visivel do seu programa na versao que segue o enunciado.
  ****************************************************************/
-int main ( int argc, char* argv[] )
-{
-	int i,j,k;
-	fractal_param_t p;
+int main (int argc, char* argv[]){
 
-	if ((argc!=2)&&(argc!=3)) {
-		fprintf(stderr,"usage %s filename [numThreads]\n", argv[0] );
-		exit(-1);
-	} 
-	if (argc==3) {
-		numThreads = atoi(argv[2]);
-	} 
-	if ((input=fopen(argv[1],"r"))==NULL) {
-		perror("fdopen");
-		exit(-1);
-	}
+    if (argc > 1){
 
-	while (input_params(&p)!=EOF) {
-		fractal(&p); // No exercicio a funcao nao vai exibir nada! :-(
-	}
+        std::queue<fractal_param_t> filaDeFractais;
+
+        //fractal_param_t p;
+
+        pthread_t threads[numThreads];
+
+        if ((argc!=2)&&(argc!=3)){
+            fprintf(stderr,"usage %s filename [numThreads]\n", argv[0]);
+            exit(-1);
+        } 
+        if (argc==3) {
+            numThreads = std::stoi(argv[2]);
+        } 
+        if ((input=fopen(argv[1],"r"))==NULL) {
+            perror("fdopen");
+            exit(-1);
+        }
+
+        for(long indexThread = 0; indexThread<numThreads; indexThread++){
+            if(indexThread == 0){
+                pthread_create(&threads[indexThread], NULL, rotinaThreadLeitura, (void*) indexThread);
+            }
+            else{
+                pthread_create(&threads[indexThread], NULL, rotinaThreadTrabalhadora, (void*) indexThread);
+            }
+        }
+
+        for(long indexThread = 0; indexThread<numThreads; indexThread++){
+            pthread_join(threads[indexThread], NULL);
+        }
+
+    }
 
 	return 0;
 }
