@@ -1,12 +1,7 @@
 // C implementation for mandelbrot set fractals using libgraph, a simple
 // library similar to the old Turbo C graphics library.
-/*****************************************************************
- * ATENCAO: a biblioteca libgraph nao funciona com pthreads, entao
- * a solucao do exercicio nao deve chamar as funcoes graficas 
- * NADA SERA EXIBIDO, INFELIZMENTE. :-(
- *****************************************************************/
 
-#include <graphics.h>
+//#include <graphics.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -68,12 +63,6 @@ void fractal( fractal_param_t* p )
 	int i, j, k, color;
 	double x, y, u, v, u2, v2;
 
-    /*************************************************************
-     * a funcao rectangle deve ser removida na versao com pthreads,
-     * ja que as bibliotecas sao conflitantes.
-     *************************************************************/
-	rectangle(p->left, p->low, p->left+p->ires-1, p->low+p->jres-1);
-
 	dx = ( p->xmax - p->xmin ) / p->ires;
 	dy = ( p->ymax - p->ymin ) / p->jres;
 	
@@ -112,56 +101,8 @@ void fractal( fractal_param_t* p )
 				// choose a range and recycle!
 				color = ( k >> color_pick ) %16;
 			}
-			// To display the created fractal
-			/******************************************************
-                         * a funcao putpixel deve ser removida na versao com pthreads,
-                         * ja que as bibliotecas sao conflitantes. Infelizmente,
-                         * isso significa que sua versao final nao tera uma saida
-                         * grafica real.
-                         ******************************************************/
-			//putpixel(p->left+i, p->low+j, color);
 		}
 	}
-}
-
-/****************************************************************
- * as funcoes init_gr e end_gr devem ser removidas na versao
- * com pthreads, ja que a biblioteca libgraph nao e compativel.
- ****************************************************************/
-void init_gr(void)
-{
-    // This starts the graphics mode in its simple form (auto detect)
-	int gd = DETECT, gm, errorcode;
-
-	char driver[] = "";
-	initgraph(&gd, &gm, driver);
-
-	// getting maximum value of x-axis of screen
-	if ((getmaxx()+1) != MAXX) {
-		fprintf(stderr,"ERR: input expects maxx==640! (not %d)\n",MAXX);
-		exit(-1);
-	}
-	if ((getmaxy()+1) != MAXY) {
-		fprintf(stderr,"ERR: input expects maxy==480 (not %d)!\n",MAXY);
-		exit(-1);
-	}
-}
-
-/****************************************************************
- * as funcoes init_gr e end_gr devem ser removidas na versao
- * com pthreads, ja que a biblioteca libgraph nao e compativel.
- ****************************************************************/
-void end_gr(void)
-{
-    //Wait for a key press before closing the window
-    int in = 0;
-    while (in == 0) {
-        in = getchar();
-    }
-
-    // closegraph function closes the graphics mode and deallocates
-	// all memory allocated by graphics system
-	closegraph();
 }
 
 /****************************************************************
@@ -195,11 +136,9 @@ int main ( int argc, char* argv[] )
 		exit(-1);
 	}
 
-	init_gr();  // Essa biblioteca nao funciona com Pthreads! REMOVA
 	while (input_params(&p)!=EOF) {
 		fractal(&p); // No exercicio a funcao nao vai exibir nada! :-(
 	}
-	end_gr();  // Essa biblioteca nao funciona com Pthreads! REMOVA
 
 	return 0;
 }
