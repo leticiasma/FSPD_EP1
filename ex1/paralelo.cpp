@@ -33,10 +33,15 @@ std::queue<fractal_param_t> filaDeFractais;
 pthread_mutex_t mutexFilaDeFractais;
 pthread_cond_t varCondFilaDeFractais;
 
-pthread_mutex_t mutexPreencheuFilaDeFractais;
-pthread_cond_t varCondPreencheuFilaDeFractais;
+pthread_mutex_t mutexFilaDeFractaisPreenchida;
+pthread_cond_t varCondFilaDeFractaisPreenchida;
+
+pthread_mutex_t mutexPreencherFilaDeFractais;
+pthread_cond_t varCondPreencherFilaDeFractais;
 
 bool inicializouFilaDeFractais = false; //Acho que isso só é de preocupação das trabalhadoras
+
+bool acharamEOW = false;
 
 /****************************************************************
  * Nesta versao, o programa principal le diretamente da entrada
@@ -120,8 +125,6 @@ bool ehFractalZerado(fractal_param_t* fractal){
 }
 
 void* rotinaThreadEntrada(void* indexThread){
-    //cout<<"Entrou na rotinaThreadEntrada"<<endl;
-
     int tamMaxFilaDeFractais = 4*(numThreads-1);
     int numFractaisAAdicionar = tamMaxFilaDeFractais; //Verificar se os zerados não ultrapassam o limite quando colocados
 
@@ -129,23 +132,14 @@ void* rotinaThreadEntrada(void* indexThread){
 
     bool acabouOArquivo = false;
 
-    fractal_param_t fractal;
-
-    int num = 1;
-
-    //while (input_params(&fractal)!=EOF){ //Supondo que sempre tem ao menos 1
-    //while(input_params(&fractal) != EOF){ //Até o final do arquivo
     while(true){
+        fractal_param_t fractal;
 
-        while (pthread_cond_wait(&varCondPreencheuFilaDeFractais, &mutexPreencheuFilaDeFractais) != 0);
+        pthread_mutex_lock(&mutexPreencherFilaDeFractais);
 
-        pthread_mutex_lock(&mutexFilaDeFractais);
-
-        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        while (pthread_cond_wait(&varCondPreencherFilaDeFractais, &mutexPreencherFilaDeFractais) != 0);
 
         numFractaisAAdicionar = tamMaxFilaDeFractais - filaDeFractais.size();
-
-        //cout<<"Precisa adicionar "<<numFractaisAAdicionar<<" fractais"<<endl;
 
         for (int i = 0; i<numFractaisAAdicionar; i++){
             if (input_params(&fractal) == EOF){
@@ -153,120 +147,71 @@ void* rotinaThreadEntrada(void* indexThread){
                 break;
             }
             filaDeFractais.push(fractal);
-            cout<<"Adicionou o fractal "<<fractal.ires<<" "<<fractal.jres<<" "<<fractal.left<<" "<<fractal.low<<" "<<fractal.xmax<<" "<<fractal.xmin<<" "<<fractal.ymax<<" "<<fractal.ymin<<" na fila"<<endl;
         }
-
-        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         if (acabouOArquivo){
             cout<<"Acabou o arquivo"<<endl;
 
-            fractal.ires = 0;
-            fractal.jres = 0;
-            fractal.left = 0;
-            fractal.low = 0;
-            fractal.xmax = 0.0;
-            fractal.xmin = 0.0;
-            fractal.ymax = 0.0;
-            fractal.ymin = 0.0;
-
-            //pthread_mutex_lock(&mutexFilaDeFractais);
-            //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
             for (int i=0; i<numThreadsTrabalhadoras; i++){
-                filaDeFractais.push(fractal);
+                fractal_param_t fractalVazio;
+
+                fractalVazio.ires = 0;
+                fractalVazio.jres = 0;
+                fractalVazio.left = 0;
+                fractalVazio.low = 0;
+                fractalVazio.xmax = 0.0;
+                fractalVazio.xmin = 0.0;
+                fractalVazio.ymax = 0.0;
+                fractalVazio.ymin = 0.0;
+
+                filaDeFractais.push(fractalVazio);
             }
 
-            //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            pthread_mutex_unlock(&mutexFilaDeFractais);
-            cout<<"Vai dar break no while"<<endl;
+            pthread_mutex_unlock(&mutexPreencherFilaDeFractais);
+
+            pthread_cond_broadcast(&varCondFilaDeFractaisPreenchida);
+
             break; //Talvez matar a leitora depois
         }
 
-        pthread_mutex_unlock(&mutexFilaDeFractais);
+        pthread_mutex_unlock(&mutexPreencherFilaDeFractais);
 
-        //Não sei se estou usando a var e o mutex certos ou se tem que criar outros 
-        //while (pthread_cond_wait(&varCondFilaDeFractais, &mutexFilaDeFractais) != 0); //Quando acaba o arquivo, de fato não dorme de novo e coloca os 4 zerados, será? Pois mudei o while para loop infinito.
-        cout<<"Thread de Entrada dormindo "<<num<<endl;
-        num++;
-
-
-        // if (!inicializouFilaDeFractais){
-        //     pthread_cond_broadcast(&varCondInicializouFilaDeFractais);                
-
-        //     inicializouFilaDeFractais = true;
-        // }
-
-        // if (filaDeFractais.size() == tamMaxFilaDeFractais){ //Acho que não precisa desse if, pois quando ela é acordada ela simplesmente preenche e pronto
-        //     //pthread_cond_wait(&varCondFilaDeFractais, &mutexFilaDeFractais);
-        // }
+        pthread_cond_broadcast(&varCondFilaDeFractaisPreenchida);          
         
     }
-    //Destruir a thread leitora ou dar um join na main
 
 }
 
 void* rotinaThreadTrabalhadora(void* indexThread){
-    //cout<<"Entrou na rotinaThreadTrabalhadora"<<endl;
     int numThreadsTrabalhadoras = numThreads - 1;
 
-    // if(!inicializouFilaDeFractais){ //Acho que pode travar se ele ver o valor desatualizado
-    //     while (pthread_cond_wait(&varCondInicializouFilaDeFractais, &mutexInicializouFilaDeFractais) != 0);
-    // }
-    // else{
+    fractal_param_t f;
 
-        //while (pthread_cond_wait(&varCondPreencheuFilaDeFractais, &mutexPreencheuFilaDeFractais) != 0);
+    while(true){
 
-        fractal_param_t f;
+        pthread_mutex_lock(&mutexFilaDeFractais);
 
-        while(true){
+        if (filaDeFractais.size() < numThreadsTrabalhadoras && !acharamEOW){ //Ou igual
+            //Acordar a thread de entrada
+            pthread_cond_signal(&varCondPreencherFilaDeFractais);
 
-            pthread_mutex_lock(&mutexFilaDeFractais);
-            //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-                f = filaDeFractais.front(); //Acho que é assim
-                filaDeFractais.pop();
-
-                if (filaDeFractais.size() == numThreadsTrabalhadoras){
-                    //Acordar a thread de entrada
-                    pthread_cond_signal(&varCondPreencheuFilaDeFractais);
-                }
-
-            //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-            pthread_mutex_unlock(&mutexFilaDeFractais);
-
-            if (ehFractalZerado(&f)){
-                break;
-            }
-
-            fractal(&f);
-
+            while (pthread_cond_wait(&varCondFilaDeFractaisPreenchida, &mutexFilaDeFractaisPreenchida) != 0);
         }
-        
-    //}
 
+        f = filaDeFractais.front();
+        filaDeFractais.pop();
 
+        if (ehFractalZerado(&f)){
+            acharamEOW = true;
+            pthread_mutex_unlock(&mutexFilaDeFractais);
+            break;
+        }
 
+        pthread_mutex_unlock(&mutexFilaDeFractais);
 
-    // std::cout<<"Vou dormir"<<std::endl;
-    // if (inicializouFilaDeFractais == false){
-    //     while (pthread_cond_wait(&varCondInicializouFilaDeFractais, &mutexInicializouFilaDeFractais) != 0);
-    // }
-    // std::cout<<"Acordei"<<std::endl;
-}
+        fractal(&f);
 
-void* func2(void* rank){
-	//Verifica se está liberado buscar na fila
-	//Tira um fractal da fila
-	//Se fila de fractais .size < (numThreads-1)
-	//acorda a thread 0
-
-	//enquanto fractal não é o EOW
-	//marcar inicio tempo
-	//chama fractal
-	//marca final tempo
-	//preencher o array de tempo das threads
-	//consegue um fractal para trabalhar com
+    }
 
 }
 
@@ -305,10 +250,10 @@ int main (int argc, char* argv[]){
         }
 
         pthread_mutex_init(&mutexFilaDeFractais, NULL);
-        pthread_mutex_init(&mutexPreencheuFilaDeFractais, NULL);
+        pthread_mutex_init(&mutexPreencherFilaDeFractais, NULL);
 
         pthread_cond_init(&varCondFilaDeFractais, NULL);
-        pthread_cond_init(&varCondPreencheuFilaDeFractais, NULL);
+        pthread_cond_init(&varCondPreencherFilaDeFractais, NULL);
 
         for(long indexThread = 0; indexThread<numThreads; indexThread++){
             if(indexThread == 0){
@@ -334,10 +279,10 @@ int main (int argc, char* argv[]){
     }
 
     pthread_mutex_destroy(&mutexFilaDeFractais);
-    pthread_mutex_destroy(&mutexPreencheuFilaDeFractais);
+    pthread_mutex_destroy(&mutexPreencherFilaDeFractais);
 
     pthread_cond_destroy(&varCondFilaDeFractais);
-    pthread_cond_destroy(&varCondPreencheuFilaDeFractais);
+    pthread_cond_destroy(&varCondPreencherFilaDeFractais);
 
 	return 0;
 
