@@ -1,6 +1,8 @@
 #include <pthread.h>
 #include <queue>
 #include <iostream>
+#include <vector>
+#include <cmath>
 
 #define MAXITER 32768
 
@@ -38,6 +40,16 @@ pthread_cond_t varCondFilaDeFractaisPreenchida;
 pthread_mutex_t mutexPreencherFilaDeFractais;
 pthread_cond_t varCondPreencherFilaDeFractais;
 
+//----------------------------------------------
+//Para a coleta das estatísticas
+int conta_fila_vazia = 0; //Considerando quando ainda há tarefas a realizar, mas não tem na fila
+int total_tarefas = 0;//Considerando que as tarefas são as operações com fractal das trabalhadoras
+float media_tarefas_pt;
+float desvio_tarefas_pt;
+float t_medio;
+float t_desvio;
+
+vector<int> tarefas_pt;
 
 //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 //FUNÇÕES DISPONIBILIZADAS NO CÓDIGO BASE
@@ -211,14 +223,20 @@ void* rotinaThreadMestre(void* indexThread){
 
 void* rotinaThreadTrabalhadora(void* indexThread){
 
+    long idThread = (long)indexThread - 1;
+
     fractal_param_t f;
 
     while(true){
 
         pthread_mutex_lock(&mutexFilaDeFractais);
 
-        if (filaFractais.size() < numThreadsTrabalhadoras && !encontradoEOW){ //Ou igual
-            pthread_cond_signal(&varCondPreencherFilaDeFractais); //Acordar a thread mestre
+        if (filaFractais.size() == 0){
+            conta_fila_vazia ++;
+        }
+
+        if ((filaFractais.size() < numThreadsTrabalhadoras) && !encontradoEOW){ //Com o <= deu ruim
+            pthread_cond_signal(&varCondPreencherFilaDeFractais); //Acordar a thread mestre 
             while (pthread_cond_wait(&varCondFilaDeFractaisPreenchida, &mutexFilaDeFractaisPreenchida) != 0);
         }
 
@@ -234,6 +252,9 @@ void* rotinaThreadTrabalhadora(void* indexThread){
         pthread_mutex_unlock(&mutexFilaDeFractais);
 
         fractal(&f);
+
+        total_tarefas ++;
+        tarefas_pt[idThread]++;
 
     }
 
@@ -275,6 +296,8 @@ int main (int argc, char* argv[]){
             pthread_create(&threads[indexThread], NULL, rotinaThreadMestre, (void*) indexThread);
         }
         else{
+            tarefas_pt.push_back(0);
+
             pthread_create(&threads[indexThread], NULL, rotinaThreadTrabalhadora, (void*) indexThread);
         }
     }
@@ -290,6 +313,22 @@ int main (int argc, char* argv[]){
 
     pthread_cond_destroy(&varCondPreencherFilaDeFractais);
     pthread_cond_destroy(&varCondFilaDeFractaisPreenchida);
+
+    for (size_t i = 0; i < tarefas_pt.size(); ++i) { //Essa média tá mt estranha
+        media_tarefas_pt += tarefas_pt[i];
+    }
+    media_tarefas_pt /= numThreadsTrabalhadoras;
+
+    for (size_t i = 0; i < tarefas_pt.size(); ++i) {
+        desvio_tarefas_pt += pow((tarefas_pt[i] - media_tarefas_pt),2);
+    }
+
+    desvio_tarefas_pt /= (numThreadsTrabalhadoras-1);
+    desvio_tarefas_pt = sqrt(desvio_tarefas_pt);
+
+    printf("Tarefas: total = %d; média por trabalhador = %f(%f)\n", total_tarefas, media_tarefas_pt, desvio_tarefas_pt);
+    //printf("Tempo médio por tarefa: %.6f (%.6f) ms\n", t_medio, t_desvio);
+    printf("Fila estava vazia: %d vezes\n", conta_fila_vazia);
 
 	return 0;
 
